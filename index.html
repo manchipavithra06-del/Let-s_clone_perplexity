@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agent</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <style>
+        :root {
+            --bg-color: #121212;
+            --input-bg: #212121;
+            --input-border: #333333;
+            --text-primary: #ECECEC;
+            --text-secondary: #9B9B9B;
+            --accent-glow: rgba(0, 150, 255, 0.08);
+            --focus-ring: rgba(255, 255, 255, 0.2);
+            --send-btn-bg: #FFFFFF;
+            --send-btn-text: #000000;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            overflow: hidden;
+        }
+
+        .ambient-glow {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 800px;
+            height: 800px;
+            background: radial-gradient(circle, var(--accent-glow) 0%, transparent 60%);
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        header {
+            width: 100%;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1;
+        }
+
+        .logo-image {
+            height: 60px;
+            object-fit: contain;
+        }
+
+        main {
+            z-index: 1;
+            width: 100%;
+            max-width: 800px;
+            padding: 0 20px 40px;
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+            gap: 20px;
+        }
+
+        #chat-history {
+            flex-grow: 1;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+            padding: 20px 0;
+            scroll-behavior: smooth;
+        }
+
+        #chat-history::-webkit-scrollbar {
+            width: 6px;
+        }
+        #chat-history::-webkit-scrollbar-thumb {
+            background: var(--input-border);
+            border-radius: 10px;
+        }
+
+        .message {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            line-height: 1.6;
+        }
+
+        .message.user {
+            align-items: flex-end;
+        }
+
+        .message.user .content {
+            background-color: var(--input-bg);
+            padding: 12px 16px;
+            border-radius: 18px 18px 0px 18px;
+            max-width: 80%;
+            border: 1px solid var(--input-border);
+        }
+
+        .message.bot {
+            align-items: flex-start;
+        }
+
+        .message.bot .content {
+            padding: 12px 0;
+            max-width: 95%;
+            color: var(--text-primary);
+        }
+
+        .message.bot .content h1, 
+        .message.bot .content h2, 
+        .message.bot .content h3 {
+            margin-top: 1em;
+            margin-bottom: 0.5em;
+        }
+        .message.bot .content p {
+            margin-bottom: 1em;
+        }
+        .message.bot .content p:last-child {
+            margin-bottom: 0;
+        }
+        .message.bot .content a {
+            color: #4da6ff;
+            text-decoration: none;
+        }
+        .message.bot .content pre {
+            background: #0d0d0d;
+            padding: 16px;
+            border-radius: 8px;
+            overflow-x: auto;
+            border: 1px solid var(--input-border);
+            margin: 1em 0;
+        }
+        .message.bot .content code {
+            font-family: monospace;
+            background: #2b2b2b;
+            padding: 2px 4px;
+            border-radius: 4px;
+        }
+
+        .search-container {
+            width: 100%;
+            background-color: var(--input-bg);
+            border: 1px solid var(--input-border);
+            border-radius: 20px;
+            padding: 16px 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+            position: relative;
+        }
+
+        .search-container:focus-within {
+            border-color: #555;
+            box-shadow: 0 0 0 1px #555, 0 10px 40px rgba(0,0,0,0.5);
+        }
+
+        /* Attached File Pill Container */
+        #attachment-container {
+            display: none;
+            flex-wrap: wrap;
+            gap: 8px;
+            padding-bottom: 8px;
+        }
+        
+        .attachment-pill {
+            background-color: rgba(255, 255, 255, 0.1);
+            border: 1px solid #444;
+            border-radius: 8px;
+            padding: 6px 12px;
+            font-size: 0.85rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: #e0e0e0;
+        }
+
+        .attachment-pill i.fa-file-pdf {
+            color: #ff4d4d;
+        }
+
+        .attachment-pill .remove-file {
+            cursor: pointer;
+            color: #888;
+            margin-left: 4px;
+            transition: color 0.2s;
+        }
+
+        .attachment-pill .remove-file:hover {
+            color: #fff;
+        }
+
+        textarea {
+            width: 100%;
+            background: transparent;
+            border: none;
+            color: var(--text-primary);
+            font-size: 1.1rem;
+            resize: none;
+            outline: none;
+            min-height: 26px;
+            max-height: 200px;
+            line-height: 1.5;
+            overflow-y: hidden;
+        }
+
+        textarea::placeholder {
+            color: var(--text-secondary);
+        }
+
+        .toolbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 100%;
+        }
+
+        .toolbar-left, .toolbar-right {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .icon-btn, .pill-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: color 0.2s ease;
+            font-size: 1rem;
+        }
+
+        .icon-btn:hover {
+            color: var(--text-primary);
+        }
+
+        .pill-btn {
+            border: 1px dashed var(--input-border);
+            border-radius: 50px;
+            padding: 8px 14px;
+            gap: 6px;
+            font-size: 0.85rem;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+
+        .pill-btn:hover {
+            border-color: #555555;
+            color: var(--text-primary);
+            background-color: rgba(255,255,255,0.02);
+        }
+
+        .send-btn {
+            background-color: var(--send-btn-bg);
+            color: var(--send-btn-text);
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: transform 0.2s ease, opacity 0.2s ease;
+        }
+
+        .send-btn:hover {
+            transform: scale(1.05);
+        }
+        
+        .send-btn:active {
+            transform: scale(0.95);
+        }
+        
+        .send-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .loading-dots {
+            display: flex;
+            gap: 6px;
+            padding: 12px 0;
+            align-items: center;
+        }
+        .dot {
+            width: 8px;
+            height: 8px;
+            background: var(--text-secondary);
+            border-radius: 50%;
+            animation: bounce 1.4s infinite ease-in-out both;
+        }
+        .dot:nth-child(1) { animation-delay: -0.32s; }
+        .dot:nth-child(2) { animation-delay: -0.16s; }
+        
+        @keyframes bounce {
+            0%, 80%, 100% { transform: scale(0); }
+            40% { transform: scale(1); }
+        }
+
+        .mic-btn.recording {
+            color: #ff4d4d;
+            animation: pulse-mic 1.5s infinite;
+        }
+        
+        @keyframes pulse-mic {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.15); color: #ff1a1a; }
+            100% { transform: scale(1); }
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .message {
+            animation: fadeIn 0.4s ease-out forwards;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="ambient-glow"></div>
+
+    <header>
+        <img src="agent_logo.png" alt="Agent" class="logo-image">
+    </header>
+
+    <main>
+        <div id="chat-history">
+            <!-- Messages will appear here -->
+        </div>
+
+        <div class="search-container">
+            <!-- File attachment pill goes here -->
+            <div id="attachment-container">
+                <div class="attachment-pill">
+                    <i class="fa-regular fa-file-pdf"></i>
+                    <span id="attachment-name">document.pdf</span>
+                    <i class="fa-solid fa-xmark remove-file" id="remove-file-btn"></i>
+                </div>
+            </div>
+
+            <textarea id="chatInput" placeholder="Type @ for connectors and attach PDFs with +" rows="1"></textarea>
+            
+            <div class="toolbar">
+                <div class="toolbar-left">
+                    <input type="file" id="pdfUploadInput" accept="application/pdf" style="display: none;">
+                    <button class="icon-btn add-btn" id="attachBtn" title="Upload PDF for analysis"><i class="fa-solid fa-plus"></i></button>
+                    <button class="pill-btn" title="Computer focus">
+                        <i class="fa-solid fa-laptop"></i> Computer <i class="fa-solid fa-plus" style="font-size: 0.7em;"></i>
+                    </button>
+                </div>
+                
+                <div class="toolbar-right">
+                    <button class="icon-btn model-btn">
+                        Model <i class="fa-solid fa-chevron-down" style="font-size: 0.7em;"></i>
+                    </button>
+                    <button class="icon-btn mic-btn">
+                        <i class="fa-solid fa-microphone"></i>
+                    </button>
+                    <button class="send-btn" id="sendBtn">
+                        <i class="fa-solid fa-arrow-up"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        const textarea = document.getElementById('chatInput');
+        const sendBtn = document.getElementById('sendBtn');
+        const chatHistory = document.getElementById('chat-history');
+        const micBtn = document.querySelector('.mic-btn');
+        
+        let isRecording = false;
+        let recognition = null;
+        let synth = window.speechSynthesis;
+
+        if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            recognition = new SpeechRecognition();
+            recognition.continuous = false;
+            recognition.interimResults = true;
+
+            recognition.onstart = function() {
+                isRecording = true;
+                micBtn.classList.add('recording');
+                textarea.placeholder = "Listening...";
+            };
+
+            recognition.onresult = function(event) {
+                let interimTranscript = '';
+                let finalTranscript = '';
+
+                for (let i = event.resultIndex; i < event.results.length; ++i) {
+                    if (event.results[i].isFinal) {
+                        finalTranscript += event.results[i][0].transcript;
+                    } else {
+                        interimTranscript += event.results[i][0].transcript;
+                    }
+                }
+                
+                if (finalTranscript) {
+                    textarea.value = finalTranscript;
+                } else if (interimTranscript) {
+                    textarea.value = interimTranscript;
+                }
+                textarea.dispatchEvent(new Event('input')); // trigger resize
+            };
+
+            recognition.onerror = function(event) {
+                console.error("Speech recognition error", event.error);
+                stopRecording();
+            };
+
+            recognition.onend = function() {
+                let wasRecording = isRecording;
+                stopRecording();
+                // Send immediately if full sentence captured and stopped naturally
+                if (wasRecording && textarea.value.trim() !== "") {
+                    sendMessage();
+                }
+            };
+        } else {
+            console.warn("Speech recognition is not supported in this browser.");
+            micBtn.style.display = 'none';
+        }
+
+        function stopRecording() {
+            isRecording = false;
+            micBtn.classList.remove('recording');
+            textarea.placeholder = "Type @ for connectors and attach PDFs with +";
+            if (recognition) {
+                recognition.stop();
+            }
+        }
+
+        micBtn.addEventListener('click', () => {
+             if (!recognition) {
+                 alert("Voice input is not supported in your browser. Please use Chrome or Edge.");
+                 return;
+             }
+             if (isRecording) {
+                 stopRecording();
+             } else {
+                 if (synth) synth.cancel(); // Stop talking if we start listening
+                 textarea.value = '';
+                 recognition.start();
+             }
+        });
+
+        // File upload constants
+        const attachBtn = document.getElementById('attachBtn');
+        const fileInput = document.getElementById('pdfUploadInput');
+        const attachmentContainer = document.getElementById('attachment-container');
+        const attachmentName = document.getElementById('attachment-name');
+        const removeFileBtn = document.getElementById('remove-file-btn');
+        let selectedFile = null;
+
+        // Auto-resize logic
+        textarea.addEventListener('input', function() {
+            this.style.height = 'auto'; 
+            const newHeight = Math.min(this.scrollHeight, 200);
+            this.style.height = newHeight + 'px';
+            if (this.scrollHeight > 200) {
+                this.style.overflowY = 'auto';
+            } else {
+                this.style.overflowY = 'hidden';
+            }
+        });
+
+        // File Selection Logic
+        attachBtn.addEventListener('click', () => {
+            fileInput.click();
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            if(e.target.files.length > 0) {
+                selectedFile = e.target.files[0];
+                attachmentName.textContent = selectedFile.name;
+                attachmentContainer.style.display = 'flex';
+                textarea.focus();
+            }
+        });
+
+        removeFileBtn.addEventListener('click', () => {
+            selectedFile = null;
+            fileInput.value = '';
+            attachmentContainer.style.display = 'none';
+        });
+
+        // Enter to send (Shift+Enter for newline)
+        textarea.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+
+        sendBtn.addEventListener('click', sendMessage);
+
+        function addMessage(text, isUser = false) {
+            const msgDiv = document.createElement('div');
+            msgDiv.className = `message ${isUser ? 'user' : 'bot'}`;
+            
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'content';
+            
+            if (isUser) {
+                contentDiv.textContent = text;
+            } else {
+                contentDiv.innerHTML = marked.parse(text);
+            }
+
+            msgDiv.appendChild(contentDiv);
+            chatHistory.appendChild(msgDiv);
+            chatHistory.scrollTop = chatHistory.scrollHeight;
+        }
+
+        function showLoading() {
+            const msgDiv = document.createElement('div');
+            msgDiv.className = 'message bot loading-msg';
+            msgDiv.innerHTML = `
+                <div class="content loading-dots">
+                    <div class="dot"></div>
+                    <div class="dot"></div>
+                    <div class="dot"></div>
+                </div>
+            `;
+            chatHistory.appendChild(msgDiv);
+            chatHistory.scrollTop = chatHistory.scrollHeight;
+            return msgDiv;
+        }
+
+        async function sendMessage() {
+            const text = textarea.value.trim();
+            if (!text && !selectedFile) return;
+
+            // Clear input
+            textarea.value = '';
+            textarea.style.height = 'auto';
+            sendBtn.disabled = true;
+
+            // Add user message, include text if file was attached
+            let displayMsg = text;
+            if (selectedFile) {
+                displayMsg = text ? `[Attached: ${selectedFile.name}]\n${text}` : `[Attached: ${selectedFile.name}]`;
+            }
+            addMessage(displayMsg, true);
+
+            // Hide the attachment pill
+            attachmentContainer.style.display = 'none';
+
+            // Show loading
+            const loadingEl = showLoading();
+
+            // Prepare FormData for multipart transfer
+            const formData = new FormData();
+            formData.append('message', text);
+            if (selectedFile) {
+                formData.append('file', selectedFile);
+            }
+
+            // Clear the file payload now that it's in formData
+            selectedFile = null;
+            fileInput.value = '';
+
+            try {
+                // Fetch URL changed back to relative to work smoothly from identical hosts/ports
+                const response = await fetch('http://127.0.0.1:8000/chat', {
+                    method: 'POST',
+                    body: formData // No Content-Type header needed for FormData mapping!
+                });
+
+                const data = await response.json();
+                
+                loadingEl.remove();
+
+                if (response.ok) {
+                    addMessage(data.reply);
+                    speakText(data.reply);
+                } else {
+                    addMessage(`Error: ${data.error || 'Server failed'}`);
+                }
+            } catch (error) {
+                loadingEl.remove();
+                addMessage('Network Error: Could not reach the server.');
+            } finally {
+                sendBtn.disabled = false;
+                textarea.focus();
+            }
+        }
+
+        function speakText(text) {
+             if (!synth) return;
+             synth.cancel();
+             
+             // Strip markdown specific syntax
+             let cleanText = text.replace(/[*_~`#]/g, '');
+             
+             const utterance = new SpeechSynthesisUtterance(cleanText);
+             utterance.rate = 1.0;
+             synth.speak(utterance);
+        }
+    </script>
+</body>
+</html>
